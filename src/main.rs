@@ -1,76 +1,58 @@
 /// A simple tool to convert big JSON array files to JSON Lines.
-///
-/// Based on this Stack Overflow answer:
-///
-/// * https://stackoverflow.com/a/68643171/1094403
+/// It just reads a big JSON array from stdin and writes JSONL
+/// to stdout, that's it.
 
-use serde::de::DeserializeOwned;
-use serde_json::{self, Deserializer};
-use std::io::{self, Read};
+use core::fmt;
+use std::{error, io};
+use serde::{Deserialize, Deserializer};
+use serde::de::{SeqAccess, Visitor};
+use serde_json::{self, Value};
+use std::marker::PhantomData;
 
-fn main() {
-    use serde_json::Value;
 
-    for value in iter_json_array(io::stdin()) {
-        let value: Value = value.unwrap();
-        let output = serde_json::to_string(&value).unwrap();
-        println!("{}", output);
-    }
+type Result<T> = std::result::Result<T, Box<dyn error::Error>>;
+
+fn main() -> Result<()> {
+    let mut deserializer =
+        serde_json::Deserializer::from_reader(io::stdin());
+    for_each(&mut deserializer, |record: Value| {
+        let output = serde_json::to_string(&record);
+        output.map(|s| println!("{}", s)).unwrap()
+    }).map_err(|e| e.into())
 }
 
 
-fn read_skipping_ws(mut reader: impl Read) -> io::Result<u8> {
-    loop {
-        let mut byte = 0u8;
-        reader.read_exact(std::slice::from_mut(&mut byte))?;
-        if !byte.is_ascii_whitespace() {
-            return Ok(byte);
+/// From: https://github.com/serde-rs/json/issues/160#issuecomment-841344394
+fn for_each<'de, D, T, F>(deserializer: D, f: F)
+    -> std::result::Result<(), D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+    F: FnMut(T),
+{
+    struct SeqVisitor<T, F>(F, PhantomData<T>);
+
+    impl<'de, T, F> Visitor<'de> for SeqVisitor<T, F>
+    where
+        T: Deserialize<'de>,
+        F: FnMut(T),
+    {
+        type Value = ();
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a nonempty sequence")
         }
-    }
-}
 
-fn invalid_data(msg: &str) -> io::Error {
-    io::Error::new(io::ErrorKind::InvalidData, msg)
-}
-
-fn deserialize_single<T: DeserializeOwned, R: Read>(reader: R) -> io::Result<T> {
-    let next_obj = Deserializer::from_reader(reader).into_iter::<T>().next();
-    match next_obj {
-        Some(result) => result.map_err(Into::into),
-        None => Err(invalid_data("premature EOF")),
-    }
-}
-
-fn yield_next_obj<T: DeserializeOwned, R: Read>(
-    mut reader: R,
-    at_start: &mut bool,
-) -> io::Result<Option<T>> {
-    if !*at_start {
-        *at_start = true;
-        if read_skipping_ws(&mut reader)? == b'[' {
-            // read the next char to see if the array is empty
-            let peek = read_skipping_ws(&mut reader)?;
-            if peek == b']' {
-                Ok(None)
-            } else {
-                deserialize_single(io::Cursor::new([peek]).chain(reader)).map(Some)
+        fn visit_seq<A>(mut self, mut seq: A) -> std::result::Result<(), A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            while let Some(value) = seq.next_element::<T>()? {
+                self.0(value)
             }
-        } else {
-            Err(invalid_data("`[` not found"))
-        }
-    } else {
-        match read_skipping_ws(&mut reader)? {
-            b',' => deserialize_single(reader).map(Some),
-            b']' => Ok(None),
-            _ => Err(invalid_data("`,` or `]` not found")),
+            Ok(())
         }
     }
+    let visitor = SeqVisitor(f, PhantomData);
+    deserializer.deserialize_seq(visitor)
 }
-
-pub fn iter_json_array<T: DeserializeOwned, R: Read>(
-    mut reader: R,
-) -> impl Iterator<Item = Result<T, io::Error>> {
-    let mut at_start = false;
-    std::iter::from_fn(move || yield_next_obj(&mut reader, &mut at_start).transpose())
-}
-
