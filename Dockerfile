@@ -2,12 +2,7 @@
 # A Dockerized build for the tool.
 #
 
-# We build on host platform and cross-compile to target arch
-FROM --platform=$BUILDPLATFORM rust:1.63-slim-bullseye as cross
-ARG TARGETARCH
-COPY docker/platform.sh .
-RUN ./platform.sh # writes /.platform and /.compiler
-RUN rustup target add $(cat /.platform)
+FROM rust:1.63-slim-bullseye AS build
 
 # We do a trick to cache the dependencies in Docker:
 #
@@ -27,7 +22,7 @@ RUN cargo build --release
 
 
 FROM debian:bullseye-slim
-COPY --from=cross \
+COPY --from=build \
     /json2jsonl/target/release/json2jsonl \
     /usr/local/bin/json2jsonl
 CMD ["json2jsonl"]
