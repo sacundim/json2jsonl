@@ -22,5 +22,7 @@ RUN cargo build --release
 
 
 FROM debian:bullseye-slim
-COPY --from=build /json2jsonl/target/release/json2jsonl /
-CMD ["/json2jsonl"]
+COPY --from=build \
+    /json2jsonl/target/release/json2jsonl \
+    /usr/local/bin/json2jsonl
+CMD ["json2jsonl"]
