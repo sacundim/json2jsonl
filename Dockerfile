@@ -5,7 +5,6 @@
 # We build on host platform and cross-compile to target arch
 FROM --platform=$BUILDPLATFORM rust:1.63-slim-bullseye as cross
 ARG TARGETARCH
-RUN echo "BUILDPLATFORM=$BUILDPLATFORM TARGETARCH=$TARGETARCH"
 COPY docker/platform.sh .
 RUN ./platform.sh # writes /.platform and /.compiler
 RUN rustup target add $(cat /.platform)

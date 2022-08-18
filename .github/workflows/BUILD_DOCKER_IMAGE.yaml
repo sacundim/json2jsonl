@@ -5,13 +5,8 @@ on:
 
   push:
     branches: [ main ]
-    paths:
-      - '.github/workflows/BUILD_DOCKER_IMAGE.yaml'
-      - 'DockerFile'
-      - '.dockerignore'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'src/**'
+    paths-ignore:
+      - 'README.md'
 
 jobs:
   docker:
