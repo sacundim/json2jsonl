@@ -5,7 +5,7 @@
 # Rust cross-compilation support to compile the foreign architecture
 # natively in the host that builds the image.
 #
-FROM --platform=$BUILDPLATFORM rust:1.63-slim-bullseye AS build
+FROM --platform=$BUILDPLATFORM rust:slim AS build
 ARG TARGETARCH
 COPY docker/platform.sh .
 RUN /platform.sh # writes /.platform and /.compiler
