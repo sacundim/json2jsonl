@@ -44,3 +44,8 @@ jobs:
           tags: |
             sacundim/json2jsonl:latest
             ghcr.io/sacundim/json2jsonl:latest
+
+      - name: Clean up untagged images from GHCR
+        uses: sacundim/delete-untagged-ghcr-action@v1
+        with:
+          package: json2jsonl
