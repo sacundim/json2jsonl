@@ -32,7 +32,7 @@ RUN mv ./target/$(cat /.platform)/release/json2jsonl \
        ./target/release/json2jsonl
 
 FROM debian:bullseye-slim
-COPY --from=build \
+COPY --link --from=build \
     /json2jsonl/target/release/json2jsonl \
     /usr/local/bin/json2jsonl
-CMD ["json2jsonl"]
+ENTRYPOINT ["json2jsonl"]
